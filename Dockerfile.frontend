@@ -1,0 +1,21 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# تثبيت متطلبات النظام
+RUN apk add --no-cache git
+
+# نسخ ملفات package
+COPY package*.json ./
+
+# تثبيت التبعيات
+RUN npm ci
+
+# نسخ ملفات المصدر
+COPY . .
+
+# فتح البورت
+EXPOSE 3000
+
+# تشغيل الخادم التطويري
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

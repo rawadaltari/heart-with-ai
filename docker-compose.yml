@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: heart-disease-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - DEBUG=false
+      - PYTHONPATH=/app
+    volumes:
+      - ./ml/models:/app/models:ro
+      - ./ml/data:/app/data:ro
+      - backend_logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - heart-disease-network
+
+  # Frontend Service (React Development Server)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: heart-disease-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:5000
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - heart-disease-network
+
+  # Nginx Reverse Proxy (للإنتاج)
+  nginx:
+    image: nginx:alpine
+    container_name: heart-disease-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - heart-disease-network
+
+  # Redis Cache (اختياري للأداء)
+  redis:
+    image: redis:7-alpine
+    container_name: heart-disease-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - heart-disease-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+networks:
+  heart-disease-network:
+    driver: bridge
+    name: heart-disease-network
+
+volumes:
+  backend_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  redis_data:
+    driver: local
+  model_data:
+    driver: local
